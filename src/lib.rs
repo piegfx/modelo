@@ -26,3 +26,20 @@ impl ImportError {
 pub trait Importer {
     fn from_path(path: &str) -> Result<Self, ImportError> where Self : Sized;
 }
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Vec3 {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Vec4 {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub w: f32
+}
