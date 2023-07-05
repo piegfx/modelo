@@ -134,17 +134,9 @@ impl Importer for Gltf {
             let mut acc_vec = Vec::with_capacity(accessors.len());
 
             for accessor in accessors {
-                let buffer_view = if let Some(bv) = accessor.get("bufferView") {
-                    Some(bv.as_u64().unwrap())
-                } else {
-                    None
-                };
+                let buffer_view = to_u64_or_none(accessor.get("bufferView"));
 
-                let byte_offset = if let Some(bo) = accessor.get("byteOffset") {
-                    bo.as_u64().unwrap()
-                } else {
-                    0
-                };
+                let byte_offset = to_u64_or_default(accessor.get("byteOffset"), 0);
 
                 let component_type = accessor.get("componentType").unwrap();
                 let component_type = match component_type.as_u64().unwrap() {
@@ -243,19 +235,11 @@ impl Importer for Gltf {
             for view in views {
                 let buffer = view.get("buffer").unwrap().as_u64().unwrap();
 
-                let byte_offset = if let Some(bo) = view.get("byteOffset") {
-                    bo.as_u64().unwrap()
-                } else {
-                    0
-                };
+                let byte_offset = to_u64_or_default(view.get("byteOffset"), 0);
 
                 let byte_length = view.get("byteLength").unwrap().as_u64().unwrap();
 
-                let byte_stride = if let Some(stride) = view.get("byteStride") {
-                    Some(stride.as_u64().unwrap())
-                } else {
-                    None
-                };
+                let byte_stride = to_u64_or_none(view.get("byteStride"));
 
                 let target = if let Some(target) = view.get("target") {
                     Some(match target.as_u64().unwrap() {
@@ -335,5 +319,14 @@ fn to_u64_or_none(option: Option<&Value>) -> Option<u64> {
         Some(value.as_u64().unwrap())
     } else {
         None
+    }
+}
+
+#[inline(always)]
+fn to_u64_or_default(option: Option<&Value>, default: u64) -> u64 {
+    if let Some(value) = option {
+        value.as_u64().unwrap()
+    } else {
+        default
     }
 }
