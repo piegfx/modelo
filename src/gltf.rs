@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::{Importer, Vec4, Vec3};
+use crate::{Importer, Vec4, Vec3, Mat4, Quat};
 
 #[derive(Debug)]
 pub struct Asset {
@@ -141,6 +141,19 @@ pub struct Mesh {
 }
 
 #[derive(Debug)]
+pub struct Node {
+    pub camera:      Option<u64>,
+    pub children:    Option<Vec<u64>>,
+    pub skin:        Option<u64>,
+    pub matrix:      Mat4,
+    pub mesh:        Option<u64>,
+    pub rotation:    Quat,
+    pub scale:       Vec3,
+    pub translation: Vec3,
+    pub weights:     Option<Vec<f32>>
+}
+
+#[derive(Debug)]
 pub struct Gltf {
     pub accessors:    Option<Vec<Accessor>>,
     pub asset:        Asset,
@@ -148,7 +161,8 @@ pub struct Gltf {
     pub buffer_views: Option<Vec<BufferView>>,
     pub images:       Option<Vec<Image>>,
     pub materials:    Option<Vec<Material>>,
-    pub meshes:       Option<Vec<Mesh>>
+    pub meshes:       Option<Vec<Mesh>>,
+    pub nodes:        Option<Vec<Node>>
 }
 
 impl Importer for Gltf {
@@ -511,6 +525,121 @@ impl Importer for Gltf {
             None
         };
 
+        let nodes = if let Some(nodes) = json.get("nodes") {
+            let nodes = nodes.as_array().unwrap();
+            let mut node_vec = Vec::with_capacity(nodes.len());
+
+            for node in nodes {
+                let camera = to_u64_or_none(node.get("camera"));
+
+                let children = if let Some(children) = node.get("children") {
+                    Some(children
+                        .as_array().unwrap()
+                        .iter()
+                        .map(|value| value.as_u64().unwrap())
+                        .collect())
+                } else {
+                    None
+                };
+
+                let skin = to_u64_or_none(node.get("skin"));
+
+                let matrix = if let Some(matrix) = node.get("matrix") {
+                    // OH GOD MAKE IT STOP
+                    // glTF matrices are in column-major order, however modelo matrices are
+                    // in row major order, so we do the conversion here. This explains the
+                    // weird array indices.
+                    Mat4 {
+                        row0: Vec4 {
+                            x: matrix[0].as_f64().unwrap() as f32,
+                            y: matrix[4].as_f64().unwrap() as f32,
+                            z: matrix[8].as_f64().unwrap() as f32,
+                            w: matrix[12].as_f64().unwrap() as f32,
+                        },
+                        row1: Vec4 {
+                            x: matrix[1].as_f64().unwrap() as f32,
+                            y: matrix[5].as_f64().unwrap() as f32,
+                            z: matrix[9].as_f64().unwrap() as f32,
+                            w: matrix[13].as_f64().unwrap() as f32,
+                        },
+                        row2: Vec4 {
+                            x: matrix[2].as_f64().unwrap() as f32,
+                            y: matrix[6].as_f64().unwrap() as f32,
+                            z: matrix[10].as_f64().unwrap() as f32,
+                            w: matrix[14].as_f64().unwrap() as f32,
+                        },
+                        row3: Vec4 {
+                            x: matrix[3].as_f64().unwrap() as f32,
+                            y: matrix[7].as_f64().unwrap() as f32,
+                            z: matrix[11].as_f64().unwrap() as f32,
+                            w: matrix[15].as_f64().unwrap() as f32,
+                        }
+                    }
+                } else {
+                    Mat4::identity()
+                };
+
+                let mesh = to_u64_or_none(node.get("mesh"));
+
+                let rotation = if let Some(rotation) = node.get("rotation") {
+                    Quat {
+                        x: rotation[0].as_f64().unwrap() as f32,
+                        y: rotation[1].as_f64().unwrap() as f32,
+                        z: rotation[2].as_f64().unwrap() as f32,
+                        w: rotation[3].as_f64().unwrap() as f32,
+                    }
+                } else {
+                    Quat::new(0.0, 0.0, 0.0, 1.0)
+                };
+
+                let scale = if let Some(scale) = node.get("scale") {
+                    Vec3 {
+                        x: scale[0].as_f64().unwrap() as f32,
+                        y: scale[1].as_f64().unwrap() as f32,
+                        z: scale[2].as_f64().unwrap() as f32,
+                    }
+                } else {
+                    Vec3::new(1.0, 1.0, 1.0)
+                };
+
+                let translation = if let Some(translation) = node.get("translation") {
+                    Vec3 {
+                        x: translation[0].as_f64().unwrap() as f32,
+                        y: translation[1].as_f64().unwrap() as f32,
+                        z: translation[2].as_f64().unwrap() as f32,
+                    }
+                } else {
+                    Vec3::new(0.0, 0.0, 0.0)
+                };
+
+                let weights = if let Some(weights) = node.get("weights") {
+                    Some(weights
+                        .as_array().unwrap()
+                        .iter()
+                        .map(|value| value.as_f64().unwrap() as f32)
+                        .collect())
+                } else {
+                    None
+                };
+
+                node_vec.push(Node {
+                    camera,
+                    children,
+                    skin,
+                    matrix,
+                    mesh,
+                    rotation,
+                    scale,
+                    translation,
+                    weights,
+                });
+            }
+
+            Some(node_vec)
+        } else {
+            None
+        };
+
         Ok(Gltf {
             asset,
             accessors,
@@ -518,7 +647,8 @@ impl Importer for Gltf {
             buffer_views,
             images,
             materials,
-            meshes
+            meshes,
+            nodes
         })
     }
 }
