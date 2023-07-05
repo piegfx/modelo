@@ -115,13 +115,40 @@ pub struct Material {
 }
 
 #[derive(Debug)]
+pub enum PrimitiveTopology {
+    Points,
+    Lines,
+    LineLoop,
+    LineStrip,
+    Triangles,
+    TriangleStrip,
+    TriangleFan
+}
+
+#[derive(Debug)]
+pub struct MeshPrimitive {
+    pub attributes: Vec<(String, u64)>,
+    pub indices:    Option<u64>,
+    pub material:   Option<u64>,
+    pub mode:       PrimitiveTopology,
+    // pub targets: 
+}
+
+#[derive(Debug)]
+pub struct Mesh {
+    pub primitives: Vec<MeshPrimitive>,
+    pub weights:    Option<Vec<f32>>
+}
+
+#[derive(Debug)]
 pub struct Gltf {
     pub accessors:    Option<Vec<Accessor>>,
     pub asset:        Asset,
     pub buffers:      Option<Vec<Buffer>>,
     pub buffer_views: Option<Vec<BufferView>>,
     pub images:       Option<Vec<Image>>,
-    pub materials:    Option<Vec<Material>>
+    pub materials:    Option<Vec<Material>>,
+    pub meshes:       Option<Vec<Mesh>>
 }
 
 impl Importer for Gltf {
@@ -418,13 +445,80 @@ impl Importer for Gltf {
             None
         };
 
+        let meshes = if let Some(meshes) = json.get("meshes") {
+            let meshes = meshes.as_array().unwrap();
+            let mut mesh_vec = Vec::with_capacity(meshes.len());
+
+            for mesh in meshes {
+                let primitives = mesh.get("primitives").unwrap().as_array().unwrap();
+                let mut prim_vec = Vec::with_capacity(primitives.len());
+
+                for primitive in primitives {
+                    let attributes = primitive.get("attributes").unwrap()
+                        .as_object().unwrap()
+                        .iter()
+                        .map(|value| {
+                            (value.0.clone(), value.1.as_u64().unwrap())
+                        })
+                        .collect();
+
+                    let indices = to_u64_or_none(primitive.get("indices"));
+
+                    let material = to_u64_or_none(primitive.get("material"));
+
+                    let mode = if let Some(mode) = primitive.get("mode") {
+                        match mode.as_u64().unwrap() {
+                            0 => PrimitiveTopology::Points,
+                            1 => PrimitiveTopology::Lines,
+                            2 => PrimitiveTopology::LineLoop,
+                            3 => PrimitiveTopology::LineStrip,
+                            4 => PrimitiveTopology::Triangles,
+                            5 => PrimitiveTopology::TriangleStrip,
+                            6 => PrimitiveTopology::TriangleFan,
+
+                            pt => panic!("Unrecognized primitive topology {pt}")
+                        }
+                    } else {
+                        PrimitiveTopology::Triangles
+                    };
+
+                    prim_vec.push(MeshPrimitive {
+                        attributes,
+                        indices,
+                        material,
+                        mode,
+                    });
+                }
+
+                let weights = if let Some(weights) = mesh.get("weights") {
+                    Some(weights
+                        .as_array().unwrap()
+                        .iter()
+                        .map(|value| value.as_f64().unwrap() as f32)
+                        .collect())
+                } else {
+                    None
+                };
+
+                mesh_vec.push(Mesh {
+                    primitives: prim_vec,
+                    weights,
+                });
+            }
+
+            Some(mesh_vec)
+        } else {
+            None
+        };
+
         Ok(Gltf {
             asset,
             accessors,
             buffers,
             buffer_views,
             images,
-            materials
+            materials,
+            meshes
         })
     }
 }
