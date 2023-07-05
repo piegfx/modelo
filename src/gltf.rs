@@ -46,9 +46,32 @@ pub struct Accessor {
 }
 
 #[derive(Debug)]
+pub struct Buffer {
+    pub uri:         Option<String>,
+    pub byte_length: u64
+}
+
+#[derive(Debug)]
+pub enum BufferTarget {
+    ArrayBuffer,
+    ElementArrayBuffer
+}
+
+#[derive(Debug)]
+pub struct BufferView {
+    pub buffer:      u64,
+    pub byte_offset: u64,
+    pub byte_length: u64,
+    pub byte_stride: Option<u64>,
+    pub target:      Option<BufferTarget>
+}
+
+#[derive(Debug)]
 pub struct Gltf {
-    pub accessors: Option<Vec<Accessor>>,
-    pub asset:     Asset
+    pub accessors:    Option<Vec<Accessor>>,
+    pub asset:        Asset,
+    pub buffers:      Option<Vec<Buffer>>,
+    pub buffer_views: Option<Vec<BufferView>>
 }
 
 impl Importer for Gltf {
@@ -179,7 +202,73 @@ impl Importer for Gltf {
             None
         };
 
-        Ok(Gltf { asset, accessors })
+        let buffers = if let Some(buffers) = json.get("buffers") {
+            let buffers = buffers.as_array().unwrap();
+            let mut buf_vec = Vec::with_capacity(buffers.len());
+
+            for buffer in buffers {
+                let uri = to_string_or_none(buffer.get("uri"));
+
+                let byte_length = buffer.get("byteLength").unwrap().as_u64().unwrap();
+
+                buf_vec.push(Buffer {
+                    uri,
+                    byte_length,
+                });
+            }
+
+            Some(buf_vec)
+        } else {
+            None
+        };
+
+        let buffer_views = if let Some(views) = json.get("bufferViews") {
+            let views = views.as_array().unwrap();
+            let mut view_vec = Vec::with_capacity(views.len());
+
+            for view in views {
+                let buffer = view.get("buffer").unwrap().as_u64().unwrap();
+
+                let byte_offset = if let Some(bo) = view.get("byteOffset") {
+                    bo.as_u64().unwrap()
+                } else {
+                    0
+                };
+
+                let byte_length = view.get("byteLength").unwrap().as_u64().unwrap();
+
+                let byte_stride = if let Some(stride) = view.get("byteStride") {
+                    Some(stride.as_u64().unwrap())
+                } else {
+                    None
+                };
+
+                let target = if let Some(target) = view.get("target") {
+                    Some(match target.as_u64().unwrap() {
+                        34962 => BufferTarget::ArrayBuffer,
+                        34963 => BufferTarget::ElementArrayBuffer,
+
+                        tg => panic!("Unrecognized target {tg}")
+                    })
+                } else {
+                    None
+                };
+
+                view_vec.push(BufferView {
+                    buffer,
+                    byte_offset,
+                    byte_length,
+                    byte_stride,
+                    target
+                });
+            }
+
+            Some(view_vec)
+        } else {
+            None
+        };
+
+        Ok(Gltf { asset, accessors, buffers, buffer_views })
     }
 }
 
