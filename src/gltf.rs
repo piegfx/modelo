@@ -67,11 +67,25 @@ pub struct BufferView {
 }
 
 #[derive(Debug)]
+pub struct Image {
+    pub uri:         Option<String>,
+
+    /// The spec says that the only officially supported mime types are
+    /// `image/jpeg` and `image/png`.
+    /// 
+    /// However, modelo also supports `image/bmp` as well, although it
+    /// will not export using this mime type as it is not in the spec.
+    pub mime_type:   Option<String>,
+    pub buffer_view: Option<u64>,
+}
+
+#[derive(Debug)]
 pub struct Gltf {
     pub accessors:    Option<Vec<Accessor>>,
     pub asset:        Asset,
     pub buffers:      Option<Vec<Buffer>>,
-    pub buffer_views: Option<Vec<BufferView>>
+    pub buffer_views: Option<Vec<BufferView>>,
+    pub images:       Option<Vec<Image>>
 }
 
 impl Importer for Gltf {
@@ -268,7 +282,36 @@ impl Importer for Gltf {
             None
         };
 
-        Ok(Gltf { asset, accessors, buffers, buffer_views })
+        let images = if let Some(images) = json.get("images") {
+            let images = images.as_array().unwrap();
+            let mut img_vec = Vec::with_capacity(images.len());
+
+            for image in images {
+                let uri = to_string_or_none(image.get("uri"));
+
+                let mime_type = to_string_or_none(image.get("mimeType"));
+
+                let buffer_view = to_u64_or_none(image.get("bufferView"));
+
+                img_vec.push(Image {
+                    uri,
+                    mime_type,
+                    buffer_view,
+                });
+            }
+
+            Some(img_vec)
+        } else {
+            None
+        };
+
+        Ok(Gltf {
+            asset,
+            accessors,
+            buffers,
+            buffer_views,
+            images
+        })
     }
 }
 
@@ -281,6 +324,15 @@ fn value_to_string(value: &Value) -> String {
 fn to_string_or_none(option: Option<&Value>) -> Option<String> {
     if let Some(value) = option {
         Some(value_to_string(value))
+    } else {
+        None
+    }
+}
+
+#[inline(always)]
+fn to_u64_or_none(option: Option<&Value>) -> Option<u64> {
+    if let Some(value) = option {
+        Some(value.as_u64().unwrap())
     } else {
         None
     }
