@@ -163,32 +163,26 @@ pub enum TextureFilter {
     LinearMipmapLinear
 }
 
+impl EnumConvert for TextureFilter {
+    fn from_u64(value: u64) -> Self {
+        match value {
+            9728 => Self::Nearest,
+            9729 => Self::Linear,
+            9984 => Self::NearestMipmapNearest,
+            9985 => Self::LinearMipmapNearest,
+            9986 => Self::NearestMipmapLinear,
+            9987 => Self::LinearMipmapLinear,
+
+            tf => panic!("Unrecognized texture filter {tf}.")
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum TextureWrapMode {
     ClampToEdge,
     MirroredRepeat,
     Repeat
-}
-
-#[derive(Debug)]
-pub struct Sampler {
-    pub mag_filter: Option<TextureFilter>,
-    pub min_filter: Option<TextureFilter>,
-    pub wrap_s:     TextureWrapMode,
-    pub wrap_t:     TextureWrapMode
-}
-
-#[derive(Debug)]
-pub struct Gltf {
-    pub accessors:    Option<Vec<Accessor>>,
-    pub asset:        Asset,
-    pub buffers:      Option<Vec<Buffer>>,
-    pub buffer_views: Option<Vec<BufferView>>,
-    pub images:       Option<Vec<Image>>,
-    pub materials:    Option<Vec<Material>>,
-    pub meshes:       Option<Vec<Mesh>>,
-    pub nodes:        Option<Vec<Node>>,
-    pub samplers:     Option<Vec<Sampler>>
 }
 
 impl EnumConvert for TextureWrapMode {
@@ -203,19 +197,32 @@ impl EnumConvert for TextureWrapMode {
     }
 }
 
-impl EnumConvert for TextureFilter {
-    fn from_u64(value: u64) -> Self {
-        match value {
-            9728 => Self::Nearest,
-            9729 => Self::Linear,
-            9984 => Self::NearestMipmapNearest,
-            9985 => Self::LinearMipmapNearest,
-            9986 => Self::NearestMipmapLinear,
-            9987 => Self::LinearMipmapLinear,
+#[derive(Debug)]
+pub struct Sampler {
+    pub mag_filter: Option<TextureFilter>,
+    pub min_filter: Option<TextureFilter>,
+    pub wrap_s:     TextureWrapMode,
+    pub wrap_t:     TextureWrapMode
+}
 
-            tf => panic!("Unrecognized texture filter {tf}.")
-        }
-    }
+#[derive(Debug)]
+pub struct Scene {
+    pub nodes: Option<Vec<u64>>
+}
+
+#[derive(Debug)]
+pub struct Gltf {
+    pub accessors:    Option<Vec<Accessor>>,
+    pub asset:        Asset,
+    pub buffers:      Option<Vec<Buffer>>,
+    pub buffer_views: Option<Vec<BufferView>>,
+    pub images:       Option<Vec<Image>>,
+    pub materials:    Option<Vec<Material>>,
+    pub meshes:       Option<Vec<Mesh>>,
+    pub nodes:        Option<Vec<Node>>,
+    pub samplers:     Option<Vec<Sampler>>,
+    pub scene:        Option<u64>,
+    pub scenes:       Option<Vec<Scene>>
 }
 
 impl Importer for Gltf {
@@ -719,16 +726,45 @@ impl Importer for Gltf {
             None
         };
 
+        let scene = to_u64_or_none(json.get("scene"));
+
+        let scenes = if let Some(scenes) = json.get("scenes") {
+            let scenes = scenes.as_array().unwrap();
+            let mut scene_vec = Vec::with_capacity(scenes.len());
+
+            for scene in scenes {
+                let nodes = if let Some(nodes) = scene.get("nodes") {
+                    Some(nodes
+                        .as_array().unwrap()
+                        .iter()
+                        .map(|value| value.as_u64().unwrap())
+                        .collect())
+                } else {
+                    None
+                };
+
+                scene_vec.push(Scene {
+                    nodes,
+                });
+            }
+
+            Some(scene_vec)
+        } else {
+            None
+        };
+
         Ok(Gltf {
-            asset,
             accessors,
+            asset,
             buffers,
             buffer_views,
             images,
             materials,
             meshes,
             nodes,
-            samplers
+            samplers,
+            scene,
+            scenes
         })
     }
 
