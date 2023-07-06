@@ -211,6 +211,12 @@ pub struct Scene {
 }
 
 #[derive(Debug)]
+pub struct Texture {
+    pub sampler: Option<u64>,
+    pub source:  Option<u64>
+}
+
+#[derive(Debug)]
 pub struct Gltf {
     pub accessors:    Option<Vec<Accessor>>,
     pub asset:        Asset,
@@ -222,7 +228,13 @@ pub struct Gltf {
     pub nodes:        Option<Vec<Node>>,
     pub samplers:     Option<Vec<Sampler>>,
     pub scene:        Option<u64>,
-    pub scenes:       Option<Vec<Scene>>
+    pub scenes:       Option<Vec<Scene>>,
+    pub textures:     Option<Vec<Texture>>,
+
+    // TODO: These
+    //pub animations:   Option<Vec<Animation>>,
+    //pub cameras:      Option<Vec<Camera>>,
+    //pub skins:        Option<Vec<Skin>>
 }
 
 impl Importer for Gltf {
@@ -753,6 +765,26 @@ impl Importer for Gltf {
             None
         };
 
+        let textures = if let Some(textures) = json.get("textures") {
+            let textures = textures.as_array().unwrap();
+            let mut tex_vec = Vec::with_capacity(textures.len());
+
+            for texture in textures {
+                let sampler = to_u64_or_none(texture.get("sampler"));
+                
+                let source = to_u64_or_none(texture.get("source"));
+
+                tex_vec.push(Texture {
+                    sampler,
+                    source,
+                });
+            }
+
+            Some(tex_vec)
+        } else {
+            None
+        };
+
         Ok(Gltf {
             accessors,
             asset,
@@ -764,7 +796,8 @@ impl Importer for Gltf {
             nodes,
             samplers,
             scene,
-            scenes
+            scenes,
+            textures
         })
     }
 
