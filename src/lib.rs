@@ -1,4 +1,8 @@
+use gltf::Gltf;
+
 pub mod gltf;
+
+pub mod native;
 
 #[derive(Debug)]
 pub enum ImportErrorType {
@@ -23,12 +27,34 @@ impl ImportError {
     }
 }
 
-pub struct Scene {
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct VertexPositionColorTextureNormalTangent {
+    pub position:  Vec3,
+    pub color:     Vec4,
+    pub tex_coord: Vec2,
+    pub normal:    Vec3,
+    pub tangent:   Vec3
+}
 
+#[derive(Debug)]
+pub struct Mesh {
+    pub vertices: Vec<VertexPositionColorTextureNormalTangent>,
+    pub indices:  Vec<u32>,
+    pub material: Option<u64>
+}
+
+#[derive(Debug)]
+pub struct Scene {
+    pub meshes: Vec<Mesh>
 }
 
 impl Scene {
+    pub fn load(path: &str) -> Self {
+        let gltf = Gltf::import(path).unwrap();
 
+        gltf.to_scene()
+    }
 }
 
 pub trait Importer {
@@ -39,6 +65,22 @@ pub trait Importer {
     fn from_scene(scene: &Scene) -> Self;
 
     fn to_scene(&self) -> Scene;
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Vec2 {
+    pub x: f32,
+    pub y: f32
+}
+
+impl Vec2 {
+    pub fn new(x: f32, y: f32) -> Self {
+        Self {
+            x,
+            y
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
