@@ -154,6 +154,31 @@ pub struct Node {
 }
 
 #[derive(Debug)]
+pub enum TextureFilter {
+    Nearest,
+    Linear,
+    NearestMipmapNearest,
+    LinearMipmapNearest,
+    NearestMipmapLinear,
+    LinearMipmapLinear
+}
+
+#[derive(Debug)]
+pub enum TextureWrapMode {
+    ClampToEdge,
+    MirroredRepeat,
+    Repeat
+}
+
+#[derive(Debug)]
+pub struct Sampler {
+    pub mag_filter: Option<TextureFilter>,
+    pub min_filter: Option<TextureFilter>,
+    pub wrap_s:     TextureWrapMode,
+    pub wrap_t:     TextureWrapMode
+}
+
+#[derive(Debug)]
 pub struct Gltf {
     pub accessors:    Option<Vec<Accessor>>,
     pub asset:        Asset,
@@ -162,11 +187,39 @@ pub struct Gltf {
     pub images:       Option<Vec<Image>>,
     pub materials:    Option<Vec<Material>>,
     pub meshes:       Option<Vec<Mesh>>,
-    pub nodes:        Option<Vec<Node>>
+    pub nodes:        Option<Vec<Node>>,
+    pub samplers:     Option<Vec<Sampler>>
+}
+
+impl EnumConvert for TextureWrapMode {
+    fn from_u64(value: u64) -> Self {
+        match value {
+            33071 => Self::ClampToEdge,
+            33648 => Self::MirroredRepeat,
+            10497 => Self::Repeat,
+
+            tm => panic!("Unrecognized texture wrap mode {tm}")
+        }
+    }
+}
+
+impl EnumConvert for TextureFilter {
+    fn from_u64(value: u64) -> Self {
+        match value {
+            9728 => Self::Nearest,
+            9729 => Self::Linear,
+            9984 => Self::NearestMipmapNearest,
+            9985 => Self::LinearMipmapNearest,
+            9986 => Self::NearestMipmapLinear,
+            9987 => Self::LinearMipmapLinear,
+
+            tf => panic!("Unrecognized texture filter {tf}.")
+        }
+    }
 }
 
 impl Importer for Gltf {
-    fn from_path(path: &str) -> Result<Self, crate::ImportError> where Self : Sized {
+    fn import(path: &str) -> Result<Self, crate::ImportError> where Self : Sized {
         let json = match std::fs::read_to_string(path) {
             Ok(json) => json,
             Err(err) => {
@@ -640,6 +693,32 @@ impl Importer for Gltf {
             None
         };
 
+        let samplers = if let Some(samplers) = json.get("samplers") {
+            let samplers = samplers.as_array().unwrap();
+            let mut samp_vec = Vec::with_capacity(samplers.len());
+
+            for sampler in samplers {
+                let mag_filter = to_enum_or_none(sampler.get("magFilter"));
+
+                let min_filter = to_enum_or_none(sampler.get("minFilter"));
+
+                let wrap_s = to_enum_or_default(sampler.get("wrapS"), TextureWrapMode::Repeat);
+
+                let wrap_t = to_enum_or_default(sampler.get("wrapT"), TextureWrapMode::Repeat);
+
+                samp_vec.push(Sampler {
+                    mag_filter,
+                    min_filter,
+                    wrap_s,
+                    wrap_t,
+                });
+            }
+
+            Some(samp_vec)
+        } else {
+            None
+        };
+
         Ok(Gltf {
             asset,
             accessors,
@@ -648,8 +727,41 @@ impl Importer for Gltf {
             images,
             materials,
             meshes,
-            nodes
+            nodes,
+            samplers
         })
+    }
+
+    fn export(path: &str) {
+        todo!()
+    }
+
+    fn from_scene(scene: &crate::Scene) -> Self {
+        todo!()
+    }
+
+    fn to_scene(&self) -> crate::Scene {
+        todo!()
+    }
+}
+
+pub trait EnumConvert {
+    fn from_u64(value: u64) -> Self;
+}
+
+fn to_enum_or_none<T: EnumConvert>(option: Option<&Value>) -> Option<T> {
+    if let Some(value) = option {
+        Some(T::from_u64(value.as_u64().unwrap()))
+    } else {
+        None
+    }
+}
+
+fn to_enum_or_default<T: EnumConvert>(option: Option<&Value>, default: T) -> T {
+    if let Some(value) = option {
+        T::from_u64(value.as_u64().unwrap())
+    } else {
+        default
     }
 }
 

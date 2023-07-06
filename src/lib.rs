@@ -23,8 +23,22 @@ impl ImportError {
     }
 }
 
+pub struct Scene {
+
+}
+
+impl Scene {
+
+}
+
 pub trait Importer {
-    fn from_path(path: &str) -> Result<Self, ImportError> where Self : Sized;
+    fn import(path: &str) -> Result<Self, ImportError> where Self : Sized;
+
+    fn export(path: &str);
+
+    fn from_scene(scene: &Scene) -> Self;
+
+    fn to_scene(&self) -> Scene;
 }
 
 #[derive(Debug, Clone, Copy)]
