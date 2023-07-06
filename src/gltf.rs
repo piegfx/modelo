@@ -20,6 +20,21 @@ pub enum ComponentType {
     Float
 }
 
+impl EnumConvert for ComponentType {
+    fn from_u64(value: u64) -> Self {
+        match value {
+            5120 => Self::Byte,
+            5121 => Self::UnsignedByte,
+            5122 => Self::Short,
+            5123 => Self::UnsignedShort,
+            5125 => Self::UnsignedInt,
+            5126 => Self::Float,
+
+            ct => panic!("Unrecognized component type {ct}")
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum AccessorType {
     Scalar,
@@ -55,6 +70,17 @@ pub struct Buffer {
 pub enum BufferTarget {
     ArrayBuffer,
     ElementArrayBuffer
+}
+
+impl EnumConvert for BufferTarget {
+    fn from_u64(value: u64) -> Self {
+        match value {
+            34962 => Self::ArrayBuffer,
+            34963 => Self::ElementArrayBuffer,
+
+            bt => panic!("Unrecognized buffer target {bt}.")
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -123,6 +149,22 @@ pub enum PrimitiveTopology {
     Triangles,
     TriangleStrip,
     TriangleFan
+}
+
+impl EnumConvert for PrimitiveTopology {
+    fn from_u64(value: u64) -> Self {
+        match value {
+            0 => Self::Points,
+            1 => Self::Lines,
+            2 => Self::LineLoop,
+            3 => Self::LineStrip,
+            4 => Self::Triangles,
+            5 => Self::TriangleStrip,
+            6 => Self::TriangleFan,
+
+            pt => panic!("Unrecognized primitive topology {pt}")
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -287,16 +329,7 @@ impl Importer for Gltf {
 
                 let byte_offset = to_u64_or_default(accessor.get("byteOffset"), 0);
 
-                let component_type = accessor.get("componentType").unwrap();
-                let component_type = match component_type.as_u64().unwrap() {
-                    5120 => ComponentType::Byte,
-                    5121 => ComponentType::UnsignedByte,
-                    5122 => ComponentType::Short,
-                    5123 => ComponentType::UnsignedShort,
-                    5125 => ComponentType::UnsignedInt,
-                    5126 => ComponentType::Float,
-                    ct => panic!("Unsupported component type {ct}")
-                };
+                let component_type = ComponentType::from_u64(accessor.get("componentType").unwrap().as_u64().unwrap());
 
                 let normalized = if let Some(norm) = accessor.get("normalized") {
                     norm.as_bool().unwrap()
@@ -390,16 +423,7 @@ impl Importer for Gltf {
 
                 let byte_stride = to_u64_or_none(view.get("byteStride"));
 
-                let target = if let Some(target) = view.get("target") {
-                    Some(match target.as_u64().unwrap() {
-                        34962 => BufferTarget::ArrayBuffer,
-                        34963 => BufferTarget::ElementArrayBuffer,
-
-                        tg => panic!("Unrecognized target {tg}")
-                    })
-                } else {
-                    None
-                };
+                let target = to_enum_or_none(view.get("target"));
 
                 view_vec.push(BufferView {
                     buffer,
@@ -552,21 +576,7 @@ impl Importer for Gltf {
 
                     let material = to_u64_or_none(primitive.get("material"));
 
-                    let mode = if let Some(mode) = primitive.get("mode") {
-                        match mode.as_u64().unwrap() {
-                            0 => PrimitiveTopology::Points,
-                            1 => PrimitiveTopology::Lines,
-                            2 => PrimitiveTopology::LineLoop,
-                            3 => PrimitiveTopology::LineStrip,
-                            4 => PrimitiveTopology::Triangles,
-                            5 => PrimitiveTopology::TriangleStrip,
-                            6 => PrimitiveTopology::TriangleFan,
-
-                            pt => panic!("Unrecognized primitive topology {pt}")
-                        }
-                    } else {
-                        PrimitiveTopology::Triangles
-                    };
+                    let mode = to_enum_or_default(primitive.get("mode"), PrimitiveTopology::Triangles);
 
                     prim_vec.push(MeshPrimitive {
                         attributes,
