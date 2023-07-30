@@ -1,6 +1,7 @@
 use gltf::Gltf;
 
 pub mod gltf;
+pub mod obj;
 
 pub mod native;
 
