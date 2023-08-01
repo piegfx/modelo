@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use gltf::Gltf;
 
 pub mod gltf;
@@ -52,9 +54,11 @@ pub struct Scene {
 
 impl Scene {
     pub fn load(path: &str) -> Self {
+        let directory = Path::new(path).parent().unwrap();
+
         let gltf = Gltf::import(path).unwrap();
 
-        gltf.to_scene()
+        gltf.to_scene(directory)
     }
 }
 
@@ -65,7 +69,7 @@ pub trait Importer {
 
     fn from_scene(scene: &Scene) -> Self;
 
-    fn to_scene(&self) -> Scene;
+    fn to_scene(&self, directory: &Path) -> Scene;
 }
 
 #[derive(Debug, Clone, Copy)]

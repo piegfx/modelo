@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use serde_json::Value;
 
 use crate::{Importer, Vec4, Vec3, Mat4, Quat};
@@ -273,6 +275,9 @@ pub struct Gltf {
     pub scenes:       Option<Vec<Scene>>,
     pub textures:     Option<Vec<Texture>>,
 
+    /// If the file is a GLB, this field should be filled.
+    pub glb_data:     Option<Vec<u8>>
+
     // TODO: These
     //pub animations:   Option<Vec<Animation>>,
     //pub cameras:      Option<Vec<Camera>>,
@@ -281,6 +286,8 @@ pub struct Gltf {
 
 impl Importer for Gltf {
     fn import(path: &str) -> Result<Self, crate::ImportError> where Self : Sized {
+        // TODO: GLB support.
+
         let json = match std::fs::read_to_string(path) {
             Ok(json) => json,
             Err(err) => {
@@ -401,7 +408,7 @@ impl Importer for Gltf {
 
                 buf_vec.push(Buffer {
                     uri,
-                    byte_length,
+                    byte_length
                 });
             }
 
@@ -807,7 +814,10 @@ impl Importer for Gltf {
             samplers,
             scene,
             scenes,
-            textures
+            textures,
+
+
+            glb_data: None
         })
     }
 
@@ -819,7 +829,31 @@ impl Importer for Gltf {
         todo!()
     }
 
-    fn to_scene(&self) -> crate::Scene {
+    fn to_scene(&self, directory: &Path) -> crate::Scene {
+        let buffers = self.buffers.as_ref().unwrap();
+        let meshes = self.meshes.as_ref().unwrap();
+        let accessors = self.accessors.as_ref().unwrap();
+
+        let buffers = {
+            let mut bufs = Vec::new();
+
+            for buffer in buffers {
+                if let Some(uri) = &buffer.uri {
+                    bufs.push(std::fs::read(directory.join(uri)).unwrap());
+                }
+            }
+
+            bufs
+        };
+
+        println!("{buffers:?}");
+
+        for mesh in meshes {
+            for primitive in &mesh.primitives {
+                let accessor = &accessors[primitive.indices.unwrap() as usize];
+            }
+        }
+
         todo!()
     }
 }

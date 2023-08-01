@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crate::{Importer, Vec3, Vec2};
 
 #[derive(Debug)]
@@ -47,7 +49,7 @@ impl Importer for Obj {
         todo!()
     }
 
-    fn to_scene(&self) -> crate::Scene {
+    fn to_scene(&self, directory: &Path) -> crate::Scene {
         todo!()
     }
 }
