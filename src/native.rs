@@ -1,9 +1,9 @@
 use std::ffi::{c_char, CStr};
 
-use crate::{VertexPositionColorTextureNormalTangent, Scene};
+use crate::{Vertex, Scene};
 
 pub struct MdMesh {
-    pub vertices:     *mut VertexPositionColorTextureNormalTangent,
+    pub vertices:     *mut Vertex,
     pub num_vertices: usize,
 
     pub indices:      *mut u32,

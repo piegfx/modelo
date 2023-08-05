@@ -33,7 +33,7 @@ impl ImportError {
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
-pub struct VertexPositionColorTextureNormalTangent {
+pub struct Vertex {
     pub position:  Vec3,
     pub color:     Vec4,
     pub tex_coord: Vec2,
@@ -43,7 +43,7 @@ pub struct VertexPositionColorTextureNormalTangent {
 
 #[derive(Debug)]
 pub struct Mesh {
-    pub vertices: Vec<VertexPositionColorTextureNormalTangent>,
+    pub vertices: Vec<Vertex>,
     pub indices:  Option<Vec<u32>>,
     pub material: Option<u64>
 }

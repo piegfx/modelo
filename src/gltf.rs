@@ -2,7 +2,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use crate::{Importer, Vec4, Vec3, Mat4, Quat, Vec2, VertexPositionColorTextureNormalTangent, utils};
+use crate::{Importer, Vec4, Vec3, Mat4, Quat, Vec2, Vertex, utils};
 
 #[derive(Debug)]
 pub struct Asset {
@@ -849,6 +849,7 @@ impl Importer for Gltf {
 
         let mut positions = Vec::new();
         let mut tex_coords = Vec::new();
+        let mut normals = Vec::new();
 
         let mut meshes = Vec::new();
 
@@ -856,6 +857,7 @@ impl Importer for Gltf {
             for primitive in &mesh.primitives {
                 positions.clear();
                 tex_coords.clear();
+                normals.clear();
 
                 for (name, index) in &primitive.attributes {
                     let accessor = &gltf_accessors[*index as usize];
@@ -888,6 +890,14 @@ impl Importer for Gltf {
                             } else {
                                 tex_coords = unsafe { std::slice::from_raw_parts::<Vec2>(buffer.as_ptr() as *const _, buffer.len() / 4 / 2).to_vec() };
                             }
+                        },
+
+                        "normal" => {
+                            if let Some(stride) = view.byte_stride {
+                                todo!();
+                            } else {
+                                normals = unsafe { std::slice::from_raw_parts::<Vec3>(buffer.as_ptr() as *const _, buffer.len() / 4 / 3).to_vec() };
+                            }
                         }
 
                         _ => {}
@@ -899,15 +909,15 @@ impl Importer for Gltf {
                 // According to the glTF spec, we can rely on the fact that every Vec will be the same length:
                 // "All attribute accessors for a given primitive MUST have the same count."
                 for i in 0..positions.len() {
-                    let vptn = VertexPositionColorTextureNormalTangent {
+                    let vertex = Vertex {
                         position: positions[i],
                         color: Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 },
                         tex_coord: tex_coords[i],
-                        normal: Vec3 { x: 0.0, y: 0.0, z: 0.0 },
+                        normal: normals[i],
                         tangent: Vec3 { x: 0.0, y: 0.0, z: 0.0 },
                     };
 
-                    vertices.push(vptn);
+                    vertices.push(vertex);
                 }
 
                 let indices = if let Some(indices) = primitive.indices {
