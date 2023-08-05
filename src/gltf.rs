@@ -836,6 +836,7 @@ impl Importer for Gltf {
         let gltf_views = self.buffer_views.as_ref().unwrap();
 
         let gltf_materials = &self.materials;
+        let gltf_images = &self.images;
 
         let buffers = {
             let mut bufs = Vec::new();
@@ -978,7 +979,7 @@ impl Importer for Gltf {
         }
 
         let materials = if let Some(gltf_materials) = gltf_materials {
-            let mut materials = Vec::new();
+            let mut materials = Vec::with_capacity(gltf_materials.len());
 
             for material in gltf_materials {
                 let pbr = match &material.pbr_metallic_roughness {
@@ -1049,10 +1050,37 @@ impl Importer for Gltf {
             None
         };
 
+        let images = if let Some(gltf_images) = gltf_images {
+            let mut images = Vec::with_capacity(gltf_images.len());
+
+            for image in gltf_images {
+                let path = if let Some(uri) = &image.uri {
+                    // TODO: Handle cases where texture data is directly stored in the URI.
+                    // These are base64 strings and start with `data:`
+
+                    // ugghhh I hate that glTF can include %xy unicode strings
+                    // TODO: Find a better way to handle these.
+                    Some(uri.clone().replace("%20", " "))
+                } else {
+                    todo!()
+                };
+
+                images.push(crate::Image {
+                    path,
+                    data_type: None,
+                    data: None
+                });
+            }
+
+            Some(images)
+        } else {
+            None
+        };
+
         crate::Scene {
             meshes,
             materials,
-            textures: None
+            images
         }
     }
 }

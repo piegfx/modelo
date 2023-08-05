@@ -1,4 +1,4 @@
-use std::ffi::{c_char, CStr};
+use std::ffi::{c_char, CStr, CString};
 
 use crate::{Vertex, Scene, Vec4, AlphaMode};
 
@@ -47,12 +47,38 @@ pub struct MdMaterial {
 }
 
 #[repr(C)]
+pub struct MdImage {
+    pub path:        *mut c_char,
+
+    pub data_type:   crate::ImageDataType,
+    pub data:        *mut u8,
+    pub data_length: usize
+}
+
+impl Drop for MdImage {
+    fn drop(&mut self) {
+        unsafe {
+            if self.path != std::ptr::null_mut() {
+                drop(CString::from_raw(self.path));
+            }
+
+            if self.data != std::ptr::null_mut() {
+                Vec::from_raw_parts(self.data, self.data_length, self.data_length);
+            }
+        }
+    }
+}
+
+#[repr(C)]
 pub struct MdScene {
     pub meshes:        *mut MdMesh,
     pub num_meshes:    usize,
 
     pub materials:     *mut MdMaterial,
-    pub num_materials: usize
+    pub num_materials: usize,
+
+    pub images:        *mut MdImage,
+    pub num_images:    usize
 }
 
 impl Drop for MdScene {
@@ -63,6 +89,9 @@ impl Drop for MdScene {
 
             println!("Dropping materials.");
             Vec::from_raw_parts(self.materials, self.num_meshes, self.num_meshes);
+
+            println!("Dropping images.");
+            Vec::from_raw_parts(self.images, self.num_images, self.num_images);
 
             println!("Dropped scene");
         }
@@ -92,7 +121,7 @@ pub unsafe extern fn mdLoad(path: *const c_char, scene: *mut *mut MdScene) {
             (std::ptr::null_mut(), 0)
         };
 
-        let material = mesh.material.unwrap_or_default();
+        let material = mesh.material.unwrap_or(usize::MAX);
 
         meshes.push(MdMesh {
             vertices,
@@ -136,12 +165,46 @@ pub unsafe extern fn mdLoad(path: *const c_char, scene: *mut *mut MdScene) {
         (std::ptr::null_mut(), 0)
     };
 
+    let (image_ptr, num_images) = if let Some(scene_images) = scene_safe.images {
+        let mut images = Vec::with_capacity(scene_images.len());
+
+        for image in scene_images {
+            let path = if let Some(path) = image.path {
+                let path = CString::new(path).unwrap();
+                let path_ptr = path.as_ptr() as *mut i8;
+                std::mem::forget(path);
+
+                path_ptr
+            } else {
+                std::ptr::null_mut()
+            };
+
+            images.push(MdImage {
+                path,
+                data_type: image.data_type.unwrap_or(crate::ImageDataType::Unknown),
+                data: std::ptr::null_mut(),
+                data_length: 0,
+            });
+        }
+
+        let image_ptr = images.as_mut_ptr();
+        let num_images = images.len();
+        std::mem::forget(images);
+
+        (image_ptr, num_images)
+    } else {
+        (std::ptr::null_mut(), 0)
+    };
+
     let scene_unsafe = MdScene {
         meshes: mesh_ptr,
         num_meshes,
 
         materials: material_ptr,
-        num_materials
+        num_materials,
+
+        images: image_ptr,
+        num_images
     };
 
     *scene = Box::into_raw(Box::new(scene_unsafe))
