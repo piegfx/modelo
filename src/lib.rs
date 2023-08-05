@@ -2,6 +2,7 @@ use std::path::Path;
 
 use gltf::Gltf;
 
+pub mod utils;
 pub mod gltf;
 pub mod obj;
 
@@ -43,7 +44,7 @@ pub struct VertexPositionColorTextureNormalTangent {
 #[derive(Debug)]
 pub struct Mesh {
     pub vertices: Vec<VertexPositionColorTextureNormalTangent>,
-    pub indices:  Vec<u32>,
+    pub indices:  Option<Vec<u32>>,
     pub material: Option<u64>
 }
 

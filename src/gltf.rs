@@ -2,7 +2,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use crate::{Importer, Vec4, Vec3, Mat4, Quat, Vec2, VertexPositionColorTextureNormalTangent};
+use crate::{Importer, Vec4, Vec3, Mat4, Quat, Vec2, VertexPositionColorTextureNormalTangent, utils};
 
 #[derive(Debug)]
 pub struct Asset {
@@ -12,7 +12,7 @@ pub struct Asset {
     pub min_version: Option<String>
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ComponentType {
     Byte,
     UnsignedByte,
@@ -857,8 +857,6 @@ impl Importer for Gltf {
                 positions.clear();
                 tex_coords.clear();
 
-                let mut vertices = Vec::new();
-
                 for (name, index) in &primitive.attributes {
                     let accessor = &gltf_accessors[*index as usize];
 
@@ -896,6 +894,10 @@ impl Importer for Gltf {
                     }
                 }
 
+                let mut vertices = Vec::new();
+
+                // According to the glTF spec, we can rely on the fact that every Vec will be the same length:
+                // "All attribute accessors for a given primitive MUST have the same count."
                 for i in 0..positions.len() {
                     let vptn = VertexPositionColorTextureNormalTangent {
                         position: positions[i],
@@ -908,9 +910,50 @@ impl Importer for Gltf {
                     vertices.push(vptn);
                 }
 
+                let indices = if let Some(indices) = primitive.indices {
+                    let accessor = &gltf_accessors[indices as usize];
+
+                    let view = &gltf_views[accessor.buffer_view.unwrap() as usize];
+
+                    let buffer = &buffers[view.buffer as usize];
+
+                    let start = view.byte_offset as usize + accessor.byte_offset as usize;
+                    let end = start + view.byte_length as usize;
+
+                    let buffer = &buffer[start..end];
+
+                    Some(unsafe {
+                        match accessor.component_type {
+                            ComponentType::Byte => {
+                                let buffer = utils::reinterpret_cast_slice::<i8>(buffer);
+                                utils::cast_slice_to_type::<i8, u32>(buffer)
+                            },
+                            ComponentType::UnsignedByte => {
+                                utils::cast_slice_to_type::<u8, u32>(buffer)
+                            },
+                            ComponentType::Short => {
+                                let buffer = utils::reinterpret_cast_slice::<i16>(buffer);
+                                utils::cast_slice_to_type::<i16, u32>(buffer)
+                            },
+                            ComponentType::UnsignedShort => {
+                                let buffer = utils::reinterpret_cast_slice::<u16>(buffer);
+                                utils::cast_slice_to_type::<u16, u32>(buffer)
+                            },
+                            // If the component type is UnsignedInt, this is the fastest to load, as no conversion
+                            // needs to be applied.
+                            ComponentType::UnsignedInt => utils::reinterpret_cast_slice::<u32>(buffer).to_vec(),
+                            ComponentType::Float => {
+                                unimplemented!()
+                            },
+                        }
+                    })
+                } else {
+                    None
+                };
+
                 meshes.push(crate::Mesh {
                     vertices,
-                    indices: Vec::new(),
+                    indices,
                     material: None,
                 });
             }

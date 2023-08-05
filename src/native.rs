@@ -49,9 +49,16 @@ pub unsafe extern fn mdLoad(path: *const c_char) -> *mut MdScene {
         let num_vertices = mesh.vertices.len();
         std::mem::forget(mesh.vertices);
 
-        let indices = mesh.indices.as_mut_ptr();
-        let num_indices = mesh.indices.len();
-        std::mem::forget(mesh.indices);
+        let (indices, num_indices) = if let Some(mut indices) = mesh.indices {
+            let num_indices = indices.len();
+            let indices_raw = indices.as_mut_ptr();
+
+            std::mem::forget(indices);
+
+            (indices_raw, num_indices)
+        } else {
+            (std::ptr::null_mut(), 0)
+        };
 
         let material = mesh.material.unwrap_or_default();
 
