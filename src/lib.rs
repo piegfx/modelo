@@ -45,7 +45,7 @@ pub struct Vertex {
 pub struct Mesh {
     pub vertices: Vec<Vertex>,
     pub indices:  Option<Vec<u32>>,
-    pub material: Option<u64>
+    pub material: Option<usize>
 }
 
 #[derive(Debug)]
@@ -68,14 +68,41 @@ pub struct Texture {
 }
 
 #[derive(Debug)]
-pub struct Material {
+#[repr(C)]
+pub enum AlphaMode {
+    Opaque,
+    Cutoff,
+    Blend
+}
 
+#[derive(Debug)]
+pub struct Material {
+    pub albedo_color:      Vec4,
+    pub albedo_texture:    Option<usize>,
+
+    pub normal_texture:    Option<usize>,
+
+    pub metallic:          f32,
+    pub metallic_texture:  Option<usize>,
+
+    pub roughness:         f32,
+    pub roughness_texture: Option<usize>,
+
+    pub occlusion_texture: Option<usize>,
+
+    pub emissive_texture:  Option<usize>,
+
+    pub alpha_mode:        AlphaMode,
+    pub alpha_cutoff:      f32,
+
+    pub double_sided:      bool
 }
 
 #[derive(Debug)]
 pub struct Scene {
     pub meshes:    Vec<Mesh>,
-    pub materials: Vec<Material>
+    pub materials: Option<Vec<Material>>,
+    pub textures:  Option<Vec<Texture>>
 }
 
 impl Scene {

@@ -835,6 +835,8 @@ impl Importer for Gltf {
         let gltf_accessors = self.accessors.as_ref().unwrap();
         let gltf_views = self.buffer_views.as_ref().unwrap();
 
+        let gltf_materials = &self.materials;
+
         let buffers = {
             let mut bufs = Vec::new();
 
@@ -911,7 +913,7 @@ impl Importer for Gltf {
                 for i in 0..positions.len() {
                     let vertex = Vertex {
                         position: positions[i],
-                        color: Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 },
+                        color: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 },
                         tex_coord: tex_coords[i],
                         normal: normals[i],
                         tangent: Vec3 { x: 0.0, y: 0.0, z: 0.0 },
@@ -961,17 +963,96 @@ impl Importer for Gltf {
                     None
                 };
 
+                let material = if let Some(material) = primitive.material {
+                    Some(material as usize)
+                } else {
+                    None
+                };
+
                 meshes.push(crate::Mesh {
                     vertices,
                     indices,
-                    material: None,
+                    material
                 });
             }
         }
 
+        let materials = if let Some(gltf_materials) = gltf_materials {
+            let mut materials = Vec::new();
+
+            for material in gltf_materials {
+                let pbr = match &material.pbr_metallic_roughness {
+                    Some(pbr) => pbr,
+                    None => &PbrMetallicRoughness {
+                        base_color_factor: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 },
+                        base_color_texture: None,
+                        metallic_factor: 1.0,
+                        roughness_factor: 1.0,
+                        metallic_roughness_texture: None,
+                    }
+                };
+
+                let albedo_texture = if let Some(texture) = &pbr.base_color_texture {
+                    Some(texture.index as usize)
+                } else {
+                    None
+                };
+
+                let metallic_roughness_texture = if let Some(texture) = &pbr.metallic_roughness_texture {
+                    Some(texture.index as usize)
+                } else {
+                    None
+                };
+
+                let normal_texture = if let Some(texture) = &material.normal_texture {
+                    Some(texture.index as usize)
+                } else {
+                    None
+                };
+
+                let occlusion_texture = if let Some(texture) = &material.occlusion_texture {
+                    Some(texture.index as usize)
+                } else {
+                    None
+                };
+
+                let emissive_texture = if let Some(texture) = &material.emissive_texture {
+                    Some(texture.index as usize)
+                } else {
+                    None
+                };
+
+                let alpha_mode = match material.alpha_mode {
+                    AlphaMode::Opaque => crate::AlphaMode::Opaque,
+                    AlphaMode::Mask => crate::AlphaMode::Cutoff,
+                    AlphaMode::Blend => crate::AlphaMode::Blend,
+                };
+
+                materials.push(crate::Material {
+                    albedo_color: pbr.base_color_factor,
+                    albedo_texture,
+                    normal_texture,
+                    metallic: pbr.metallic_factor,
+                    metallic_texture: metallic_roughness_texture,
+                    roughness: pbr.roughness_factor,
+                    roughness_texture: metallic_roughness_texture,
+                    occlusion_texture,
+                    emissive_texture,
+                    alpha_mode,
+                    alpha_cutoff: material.alpha_cutoff,
+                    double_sided: material.double_sided,
+                });
+            }
+
+            Some(materials)
+        } else {
+            None
+        };
+
         crate::Scene {
             meshes,
-            materials: Vec::new()
+            materials,
+            textures: None
         }
     }
 }
