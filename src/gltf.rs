@@ -970,7 +970,8 @@ impl Importer for Gltf {
         }
 
         crate::Scene {
-            meshes
+            meshes,
+            materials: Vec::new()
         }
     }
 }

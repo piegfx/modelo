@@ -49,8 +49,33 @@ pub struct Mesh {
 }
 
 #[derive(Debug)]
+pub enum ImageDataType {
+    Unknown,
+    Png,
+    Jpg,
+    Bmp,
+    Dds
+}
+
+#[derive(Debug)]
+pub struct Texture {
+    pub path:      Option<String>,
+
+    pub data_type: Option<ImageDataType>,
+    pub data:      Option<Vec<u8>>
+
+    // TODO: Texture sampler state
+}
+
+#[derive(Debug)]
+pub struct Material {
+
+}
+
+#[derive(Debug)]
 pub struct Scene {
-    pub meshes: Vec<Mesh>
+    pub meshes:    Vec<Mesh>,
+    pub materials: Vec<Material>
 }
 
 impl Scene {

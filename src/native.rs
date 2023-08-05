@@ -38,13 +38,13 @@ impl Drop for MdScene {
 }
 
 #[no_mangle]
-pub unsafe extern fn mdLoad(path: *const c_char) -> *mut MdScene {
+pub unsafe extern fn mdLoad(path: *const c_char, scene: *mut *mut MdScene) {
     let path = CStr::from_ptr(path).to_str().unwrap();
-    let scene = Scene::load(path);
+    let scene_safe = Scene::load(path);
 
-    let mut meshes = Vec::with_capacity(scene.meshes.len());
+    let mut meshes = Vec::with_capacity(scene_safe.meshes.len());
     
-    for mut mesh in scene.meshes {
+    for mut mesh in scene_safe.meshes {
         let vertices = mesh.vertices.as_mut_ptr();
         let num_vertices = mesh.vertices.len();
         std::mem::forget(mesh.vertices);
@@ -75,10 +75,17 @@ pub unsafe extern fn mdLoad(path: *const c_char) -> *mut MdScene {
     let num_meshes = meshes.len();
     std::mem::forget(meshes);
 
-    let scene = MdScene {
+    let scene_unsafe = MdScene {
         meshes: mesh_ptr,
         num_meshes,
     };
 
-    Box::into_raw(Box::new(scene))
+    *scene = Box::into_raw(Box::new(scene_unsafe))
+}
+
+#[no_mangle]
+pub unsafe extern fn mdFree(scene: *mut MdScene) {
+    println!("start drop");
+    drop(Box::from_raw(scene));
+    println!("finish drop");
 }
