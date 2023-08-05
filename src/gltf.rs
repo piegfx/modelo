@@ -833,6 +833,7 @@ impl Importer for Gltf {
         let buffers = self.buffers.as_ref().unwrap();
         let meshes = self.meshes.as_ref().unwrap();
         let accessors = self.accessors.as_ref().unwrap();
+        let views = self.buffer_views.as_ref().unwrap();
 
         let buffers = {
             let mut bufs = Vec::new();
@@ -846,11 +847,30 @@ impl Importer for Gltf {
             bufs
         };
 
-        println!("{buffers:?}");
+        //let mut vertices = Vec::new();
+        //let mut tex_coords = Vec::new();
 
         for mesh in meshes {
             for primitive in &mesh.primitives {
-                let accessor = &accessors[primitive.indices.unwrap() as usize];
+                for (name, index) in &primitive.attributes {
+                    let accessor = &accessors[*index as usize];
+
+                    let name = name.to_lowercase();
+                    let name = name.as_str();
+
+                    let buffer = &buffers[views[accessor.buffer_view.unwrap() as usize].buffer as usize];
+                    let buffer = &buffer[accessor.byte_offset as usize..];
+
+                    match name {
+                        "position" => {
+                            unsafe {
+                                println!("{:?}", std::slice::from_raw_parts::<Vec3>(buffer.as_ptr() as *const _, buffer.len() / 4 / 3));
+                            }
+                        },
+
+                        _ => {}
+                    }
+                }
             }
         }
 
