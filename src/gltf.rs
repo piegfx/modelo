@@ -2,7 +2,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use crate::{Importer, Vec4, Vec3, Mat4, Quat};
+use crate::{Importer, Vec4, Vec3, Mat4, Quat, Vec2, VertexPositionColorTextureNormalTangent};
 
 #[derive(Debug)]
 pub struct Asset {
@@ -830,15 +830,15 @@ impl Importer for Gltf {
     }
 
     fn to_scene(&self, directory: &Path) -> crate::Scene {
-        let buffers = self.buffers.as_ref().unwrap();
-        let meshes = self.meshes.as_ref().unwrap();
-        let accessors = self.accessors.as_ref().unwrap();
-        let views = self.buffer_views.as_ref().unwrap();
+        let gltf_buffers = self.buffers.as_ref().unwrap();
+        let gltf_meshes = self.meshes.as_ref().unwrap();
+        let gltf_accessors = self.accessors.as_ref().unwrap();
+        let gltf_views = self.buffer_views.as_ref().unwrap();
 
         let buffers = {
             let mut bufs = Vec::new();
 
-            for buffer in buffers {
+            for buffer in gltf_buffers {
                 if let Some(uri) = &buffer.uri {
                     bufs.push(std::fs::read(directory.join(uri)).unwrap());
                 }
@@ -847,34 +847,78 @@ impl Importer for Gltf {
             bufs
         };
 
-        //let mut vertices = Vec::new();
-        //let mut tex_coords = Vec::new();
+        let mut positions = Vec::new();
+        let mut tex_coords = Vec::new();
 
-        for mesh in meshes {
+        let mut meshes = Vec::new();
+
+        for mesh in gltf_meshes {
             for primitive in &mesh.primitives {
+                positions.clear();
+                tex_coords.clear();
+
+                let mut vertices = Vec::new();
+
                 for (name, index) in &primitive.attributes {
-                    let accessor = &accessors[*index as usize];
+                    let accessor = &gltf_accessors[*index as usize];
 
                     let name = name.to_lowercase();
                     let name = name.as_str();
 
-                    let buffer = &buffers[views[accessor.buffer_view.unwrap() as usize].buffer as usize];
-                    let buffer = &buffer[accessor.byte_offset as usize..];
+                    let view = &gltf_views[accessor.buffer_view.unwrap() as usize];
+
+                    let buffer = &buffers[view.buffer as usize];
+
+                    let start = view.byte_offset as usize + accessor.byte_offset as usize;
+                    let end = start + view.byte_length as usize;
+
+                    let buffer = &buffer[start..end];
 
                     match name {
                         "position" => {
-                            unsafe {
-                                println!("{:?}", std::slice::from_raw_parts::<Vec3>(buffer.as_ptr() as *const _, buffer.len() / 4 / 3));
+                            if let Some(stride) = view.byte_stride {
+                                todo!();
+                            } else {
+                                positions = unsafe { std::slice::from_raw_parts::<Vec3>(buffer.as_ptr() as *const _, buffer.len() / 4 / 3).to_vec() };
                             }
                         },
+
+                        // TODO: Handle multiple texture coordinates.
+                        "texcoord_0" => {
+                            if let Some(stride) = view.byte_stride {
+                                todo!();
+                            } else {
+                                tex_coords = unsafe { std::slice::from_raw_parts::<Vec2>(buffer.as_ptr() as *const _, buffer.len() / 4 / 2).to_vec() };
+                            }
+                        }
 
                         _ => {}
                     }
                 }
+
+                for i in 0..positions.len() {
+                    let vptn = VertexPositionColorTextureNormalTangent {
+                        position: positions[i],
+                        color: Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 },
+                        tex_coord: tex_coords[i],
+                        normal: Vec3 { x: 0.0, y: 0.0, z: 0.0 },
+                        tangent: Vec3 { x: 0.0, y: 0.0, z: 0.0 },
+                    };
+
+                    vertices.push(vptn);
+                }
+
+                meshes.push(crate::Mesh {
+                    vertices,
+                    indices: Vec::new(),
+                    material: None,
+                });
             }
         }
 
-        todo!()
+        crate::Scene {
+            meshes
+        }
     }
 }
 
