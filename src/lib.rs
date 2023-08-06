@@ -32,16 +32,17 @@ impl ImportError {
 }
 
 pub mod load_flags {
-    pub const NONE: u32 = 0;
+    pub const NONE:             u32 = 0;
     pub const GENERATE_INDICES: u32 = 1 << 0;
+    pub const GENERATE_NORMALS: u32 = 1 << 1;
 }
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct Vertex {
     pub position:  Vec3,
-    pub color:     Vec4,
     pub tex_coord: Vec2,
+    pub color:     Vec4,
     pub normal:    Vec3,
     pub tangent:   Vec3
 }
@@ -155,6 +156,72 @@ impl Scene {
             }
         }
 
+        // TODO: I'm not 100% sure this is entirely working correctly. Some of the normals look a bit off.
+        if (flags & load_flags::GENERATE_NORMALS) != 0 {
+            for mesh in &mut scene.meshes {
+                let indices = mesh.indices.as_ref();
+                let vertices = &mut mesh.vertices;
+
+                // As normals *should* always have a magnitude of precisely 1, we just check
+                // to see if the magnitude is greater than 0.5.
+                // If no normals have been generated, the magnitude will be 0/NaN, so we generate them.
+                // Otherwise, don't bother.
+                // TODO: This does need testing to make sure it works properly.
+                if vertices[0].normal.magnitude() > 0.5 {
+                    continue;
+                }
+
+                println!("Generating normals for mesh!");
+
+                if let Some(indices) = indices {
+                    for i in (0..indices.len()).step_by(3) {
+                        let i1 = indices[i + 0];
+                        let i2 = indices[i + 1];
+                        let i3 = indices[i + 2];
+
+                        let v1 = &vertices[i1 as usize];
+                        let v2 = &vertices[i2 as usize];
+                        let v3 = &vertices[i3 as usize];
+
+                        let e1 = v1.position - v2.position;
+                        let e2 = v3.position - v2.position;
+                        let mut no = Vec3::cross(&e1, &e2);
+
+                        no.x = -no.x;
+                        no.y = -no.y;
+                        no.z = -no.z;
+
+                        vertices[i1 as usize].normal += no;
+                        vertices[i2 as usize].normal += no;
+                        vertices[i3 as usize].normal += no;
+                    }
+                } else {
+                    // TODO: For some reason this only generates flat-shaded normals, instead of smooth-shaded.
+                    for i in (0..vertices.len()).step_by(3) {
+                        let v1 = &vertices[i + 0];
+                        let v2 = &vertices[i + 1];
+                        let v3 = &vertices[i + 2];
+
+                        let e1 = v1.position - v2.position;
+                        let e2 = v3.position - v2.position;
+                        let mut no = Vec3::cross(&e1, &e2);
+
+                        no.x = -no.x;
+                        no.y = -no.y;
+                        no.z = -no.z;
+
+                        vertices[i + 0].normal += no;
+                        vertices[i + 1].normal += no;
+                        vertices[i + 2].normal += no;
+                    }
+                }
+
+                for vertex in vertices {
+                    vertex.normal.normalize();
+                }
+            }
+        }
+
         scene
     }
 }
@@ -199,6 +266,53 @@ impl Vec3 {
             x,
             y,
             z
+        }
+    }
+
+    pub fn magnitude_squared(&self) -> f32 {
+        self.dot(self)
+    }
+
+    pub fn magnitude(&self) -> f32 {
+        self.magnitude_squared().sqrt()
+    }
+
+    pub fn normalize(&mut self) {
+        let magnitude = self.magnitude();
+        self.x /= magnitude;
+        self.y /= magnitude;
+        self.z /= magnitude;
+    }
+
+    pub fn dot(&self, vec: &Self) -> f32 {
+        self.x * vec.x + self.y * vec.y + self.z * vec.z
+    }
+
+    pub fn cross(&self, vec: &Self) -> Self {
+        Self {
+            x: self.y * vec.z - self.z * vec.y,
+            y: self.z * vec.x - self.x * vec.z,
+            z: self.x * vec.y - self.y * vec.x
+        }
+    }
+}
+
+impl std::ops::AddAssign<Vec3> for Vec3 {
+    fn add_assign(&mut self, rhs: Vec3) {
+        self.x += rhs.x;
+        self.y += rhs.y;
+        self.z += rhs.z;
+    }
+}
+
+impl std::ops::Sub<Vec3> for Vec3 {
+    type Output = Self;
+
+    fn sub(self, rhs: Vec3) -> Self::Output {
+        Self::Output {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
         }
     }
 }
