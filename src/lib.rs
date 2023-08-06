@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, collections::HashMap};
 
 use gltf::Gltf;
 
@@ -110,7 +110,49 @@ impl Scene {
 
         let gltf = Gltf::import(path).unwrap();
 
-        gltf.to_scene(directory)
+        let mut scene = gltf.to_scene(directory);
+
+        // TODO: This.
+        let generate_indices = true;
+
+        if generate_indices {
+            // Stores a list of all vertices, of type HashableVertex as floats can't be easily hashed.
+            let mut vertex_cache = HashMap::new();
+
+            for mut mesh in &mut scene.meshes {
+                if mesh.indices.is_some() {
+                    continue;
+                }
+
+                vertex_cache.clear();
+
+                // I'm not a fan of all the allocation but it's the only way I can see of doing it.
+                let mut vertices = Vec::new();
+                let mut indices = Vec::with_capacity(mesh.vertices.len());
+
+                let mut id = 0u32;
+
+                for vertex in &mesh.vertices {
+                    let h_vertex: HashableVertex = unsafe { std::mem::transmute(*vertex) };
+
+                    // If there is a duplicate, add it to the indices list.
+                    if let Some(index) = vertex_cache.get(&h_vertex) {
+                        indices.push(*index);
+                    } else {
+                        vertex_cache.insert(h_vertex, id);
+                        vertices.push(*vertex);
+                        indices.push(id);
+
+                        id += 1;
+                    }
+                }
+
+                mesh.vertices = vertices;
+                mesh.indices = Some(indices);
+            }
+        }
+
+        scene
     }
 }
 
@@ -207,4 +249,38 @@ impl Mat4 {
             row3: Vec4::new(0.0, 0.0, 0.0, 1.0),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[repr(C)]
+struct HashableVec2 {
+    pub x: u32,
+    pub y: u32
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[repr(C)]
+struct HashableVec3 {
+    pub x: u32,
+    pub y: u32,
+    pub z: u32
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[repr(C)]
+struct HashableVec4 {
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
+    pub w: u32,
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[repr(C)]
+struct HashableVertex {
+    pub position:  HashableVec3,
+    pub color:     HashableVec4,
+    pub tex_coord: HashableVec2,
+    pub normal:    HashableVec3,
+    pub tangent:   HashableVec3
 }

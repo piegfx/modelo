@@ -877,29 +877,34 @@ impl Importer for Gltf {
 
                     let buffer = &buffer[start..end];
 
+                    let stride = match view.byte_stride {
+                        Some(stride) => stride as usize,
+                        None => 0
+                    };
+
                     match name {
                         "position" => {
-                            if let Some(stride) = view.byte_stride {
+                            if stride != 0 && stride != std::mem::size_of::<Vec3>() {
                                 todo!();
                             } else {
-                                positions = unsafe { std::slice::from_raw_parts::<Vec3>(buffer.as_ptr() as *const _, buffer.len() / 4 / 3).to_vec() };
+                                positions = unsafe { std::slice::from_raw_parts::<Vec3>(buffer.as_ptr() as *const _, buffer.len() / std::mem::size_of::<Vec3>()).to_vec() };
                             }
                         },
 
                         // TODO: Handle multiple texture coordinates.
                         "texcoord_0" => {
-                            if let Some(stride) = view.byte_stride {
+                            if stride != 0 && stride != std::mem::size_of::<Vec2>() {
                                 todo!();
                             } else {
-                                tex_coords = unsafe { std::slice::from_raw_parts::<Vec2>(buffer.as_ptr() as *const _, buffer.len() / 4 / 2).to_vec() };
+                                tex_coords = unsafe { std::slice::from_raw_parts::<Vec2>(buffer.as_ptr() as *const _, buffer.len() / std::mem::size_of::<Vec2>()).to_vec() };
                             }
                         },
 
                         "normal" => {
-                            if let Some(stride) = view.byte_stride {
+                            if stride != 0 && stride != std::mem::size_of::<Vec3>() {
                                 todo!();
                             } else {
-                                normals = unsafe { std::slice::from_raw_parts::<Vec3>(buffer.as_ptr() as *const _, buffer.len() / 4 / 3).to_vec() };
+                                normals = unsafe { std::slice::from_raw_parts::<Vec3>(buffer.as_ptr() as *const _, buffer.len() / std::mem::size_of::<Vec3>()).to_vec() };
                             }
                         }
 
@@ -912,11 +917,16 @@ impl Importer for Gltf {
                 // According to the glTF spec, we can rely on the fact that every Vec will be the same length:
                 // "All attribute accessors for a given primitive MUST have the same count."
                 for i in 0..positions.len() {
+                    let normal = match normals.get(i) {
+                        Some(normal) => *normal,
+                        None => Vec3 { x: 0.0, y: 0.0, z: 0.0 }
+                    };
+
                     let vertex = Vertex {
                         position: positions[i],
                         color: Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 },
                         tex_coord: tex_coords[i],
-                        normal: normals[i],
+                        normal,
                         tangent: Vec3 { x: 0.0, y: 0.0, z: 0.0 },
                     };
 
