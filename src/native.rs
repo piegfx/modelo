@@ -99,9 +99,9 @@ impl Drop for MdScene {
 }
 
 #[no_mangle]
-pub unsafe extern fn mdLoad(path: *const c_char, scene: *mut *mut MdScene) {
+pub unsafe extern fn mdLoad(path: *const c_char, flags: u32, scene: *mut *mut MdScene) {
     let path = CStr::from_ptr(path).to_str().unwrap();
-    let scene_safe = Scene::load(path);
+    let scene_safe = Scene::load(path, flags);
 
     let mut meshes = Vec::with_capacity(scene_safe.meshes.len());
     

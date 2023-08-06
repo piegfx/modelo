@@ -31,6 +31,11 @@ impl ImportError {
     }
 }
 
+pub mod load_flags {
+    pub const NONE: u32 = 0;
+    pub const GENERATE_INDICES: u32 = 1 << 0;
+}
+
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct Vertex {
@@ -105,17 +110,15 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn load(path: &str) -> Self {
+    pub fn load(path: &str, flags: u32) -> Self {
         let directory = Path::new(path).parent().unwrap();
 
         let gltf = Gltf::import(path).unwrap();
 
         let mut scene = gltf.to_scene(directory);
 
-        // TODO: This.
-        let generate_indices = true;
-
-        if generate_indices {
+        // Generates indices if they are not present, and deduplicates them while it's at it.
+        if (flags & load_flags::GENERATE_INDICES) != 0 {
             // Stores a list of all vertices, of type HashableVertex as floats can't be easily hashed.
             let mut vertex_cache = HashMap::new();
 
