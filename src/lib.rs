@@ -1,5 +1,6 @@
 use std::{path::Path, collections::HashMap};
 
+use bitflags::bitflags;
 use gltf::Gltf;
 
 pub mod utils;
@@ -31,10 +32,12 @@ impl ImportError {
     }
 }
 
-pub mod load_flags {
-    pub const NONE:             u32 = 0;
-    pub const GENERATE_INDICES: u32 = 1 << 0;
-    pub const GENERATE_NORMALS: u32 = 1 << 1;
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct PostProcessFlags: u32 {
+        const GENERATE_INDICES = 1 << 0;
+        const GENERATE_NORMALS = 1 << 1;
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -111,19 +114,24 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn load(path: &str, flags: u32) -> Self {
+    pub fn load(path: &str, flags: PostProcessFlags) -> Self {
         let directory = Path::new(path).parent().unwrap();
 
         let gltf = Gltf::import(path).unwrap();
 
         let mut scene = gltf.to_scene(directory);
+        scene.post_process(flags);
 
+        scene
+    }
+
+    pub fn post_process(&mut self, flags: PostProcessFlags) {
         // Generates indices if they are not present, and deduplicates them while it's at it.
-        if (flags & load_flags::GENERATE_INDICES) != 0 {
+        if flags.contains(PostProcessFlags::GENERATE_INDICES) {
             // Stores a list of all vertices, of type HashableVertex as floats can't be easily hashed.
             let mut vertex_cache = HashMap::new();
 
-            for mut mesh in &mut scene.meshes {
+            for mut mesh in &mut self.meshes {
                 if mesh.indices.is_some() {
                     continue;
                 }
@@ -157,8 +165,8 @@ impl Scene {
         }
 
         // TODO: I'm not 100% sure this is entirely working correctly. Some of the normals look a bit off.
-        if (flags & load_flags::GENERATE_NORMALS) != 0 {
-            for mesh in &mut scene.meshes {
+        if flags.contains(PostProcessFlags::GENERATE_NORMALS) {
+            for mesh in &mut self.meshes {
                 let indices = mesh.indices.as_ref();
                 let vertices = &mut mesh.vertices;
 
@@ -221,8 +229,6 @@ impl Scene {
                 }
             }
         }
-
-        scene
     }
 }
 
